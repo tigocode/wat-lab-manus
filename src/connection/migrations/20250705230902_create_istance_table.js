@@ -7,7 +7,7 @@ exports.up = function (knex) {
     table.increments('id').primary();
     table.string('instance').notNullable().unique();
     table.string('status').defaultTo('disconnected');
-    table.text('qrcode_or_pairingcode');
+    table.text('qrcode');
     table.timestamp('qr_expires_at');
     table.string('phone');
     table.timestamps(true, true);
