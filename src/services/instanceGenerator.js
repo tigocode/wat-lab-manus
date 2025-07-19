@@ -9,8 +9,8 @@ const instanceGenerator = async (company, name) => {
   const hash = crypto.createHash('sha256').update(instance).digest('hex');
   const numericHash = parseInt(hash.slice(0, 8), 16);
   const code = (numericHash % 900000) + 100000;
-  
-  return code;
+
+  return code.toString();
 };
 
 const extractedFirstAndLast = async (text) => {

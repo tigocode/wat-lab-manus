@@ -31,6 +31,7 @@ const createInstances = async (instance) => {
   sock = makeWASocket({
     version,
     auth: state,
+    printQRInTerminal: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -40,7 +41,7 @@ const createInstances = async (instance) => {
     if (progress === 100) {
       syncCompleted = true;
       console.log('✅ Sincronização de mensagens concluída (progress = 100)');
-      await finalizeInstance(instance); // 🔄 chama função que envia p/ S3 e encerra sessão
+      await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
     }
   });
 
@@ -53,8 +54,8 @@ const createInstances = async (instance) => {
     if (connection === 'close') await handleClose(update, instance);
   });
 
-  return { 
-    message: `Instância criada com sucesso!`, 
+  return {
+    message: `Instância criada com sucesso!`,
     instance: instance,
   };
 };
@@ -118,10 +119,18 @@ const handleOpen = async (instance) => {
   console.log('✅ Conectado com sucesso:', wId);
 };
 
-const finalizeInstance = async (instance) => {
+const finalizeInstance = async (instance, authPath) => {
+  const requiredFiles = ['creds.json'];
+  const hasRequiredFiles = requiredFiles.every(file =>
+    fs.existsSync(path.join(authPath, file))
+  );
+  if (!hasRequiredFiles) {
+    console.warn('⚠️ Credenciais incompletas, adiando upload e logout.');
+    return;
+  }
+
   try {
     await uploadToS3(instance);
-    await sock.logout(); // encerra a sessão com segurança
     console.log('🔒 Sessão encerrada com sucesso após upload.');
     await removeAuthFolder(instance); // só apaga agora
   } catch (err) {
@@ -149,7 +158,10 @@ const handleClose = async (update, instance) => {
 
   if (!loggedOut) {
     console.log(`🔄 Tentando reconectar instância: ${instance}`);
-    createInstances(instance);
+    await createInstances(instance);
+  } else {
+    // Se desconectou por logout, pode aguardar nova chamada para criação
+    console.log('⚠️ Sessão finalizada via logout. Aguardando nova criação.');
   }
 };
 
