@@ -11,6 +11,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs-extra');
 const path = require('path');
 const connec = require('../connection/connection');
+const { waitFor } = require('../utils/waitFor');
 
 let sock;
 const S3 = new S3Client({
@@ -32,25 +33,30 @@ const createInstances = async (instance) => {
     version,
     auth: state,
     printQRInTerminal: false,
+    shouldSyncHistoryMessage: () => false,
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ✅ Espera o evento de sincronização 100%
-  sock.ev.on('messaging-history.set', async ({ progress }) => {
-    if (progress === 100) {
-      syncCompleted = true;
-      console.log('✅ Sincronização de mensagens concluída (progress = 100)');
-      await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
-    }
-  });
+  /*   // ✅ Espera o evento de sincronização 100%
+    sock.ev.on('messaging-history.set', async ({ progress }) => {
+      if (progress === 100) {
+        syncCompleted = true;
+        console.log('✅ Sincronização de mensagens concluída (progress = 100)');
+        await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
+      }
+    }); */
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr } = update;
 
     if (qr) await handleQr(update, instance);
 
-    if (connection === 'open') await handleOpen(instance);
+    if (connection === 'open') {
+      await handleOpen(instance, authFolder);
+      await finalizeInstance(instance, authFolder);
+    }
+
     if (connection === 'close') await handleClose(update, instance);
   });
 
@@ -115,7 +121,6 @@ const handleOpen = async (instance) => {
       qr_expires_at: null,
       updated_at: connec.fn.now(),
     });
-
   console.log('✅ Conectado com sucesso:', wId);
 };
 
@@ -138,7 +143,7 @@ const finalizeInstance = async (instance, authPath) => {
   }
 };
 
-const handleClose = async (update, instance) => {
+const handleClose = async (update, instance, authFolder) => {
   const { lastDisconnect } = update;
   const statusCode = lastDisconnect?.error?.output?.statusCode;
   const loggedOut = statusCode === DisconnectReason.loggedOut;
@@ -193,15 +198,28 @@ const uploadToS3 = async (instance) => {
 
 const removeAuthFolder = async (instance) => {
   const authPath = path.resolve(__dirname, '..', 'auth', instance);
+
+  const timeoutMs = 12 * 60 * 1000; // 12 minutos
+  const timeoutId = setTimeout(() => {
+    console.error(`⏰ Timeout ao tentar remover pasta ${authPath}`);
+  }, timeoutMs);
+
   try {
+    await waitFor('Remoção da pasta de autenticação', 2 * 60 * 1000); // 2 minutos
+
     if (await fs.pathExists(authPath)) {
       await fs.remove(authPath);
       console.log(`🧹 Pasta de autenticação ${authPath} removida com sucesso!`);
+    } else {
+      console.warn(`⚠️ Pasta de autenticação ${authPath} não encontrada para remover.`);
     }
   } catch (err) {
-    console.error(`❌ Erro ao remover pasta ${authPath}:`, err.message);
+    throw new Error(`❌ Erro ao remover pasta ${authPath}: ${err.message}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
+
 
 module.exports = {
   createInstances,
