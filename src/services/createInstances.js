@@ -33,7 +33,7 @@ const createInstances = async (instance) => {
     version,
     auth: state,
     printQRInTerminal: false,
-    shouldSyncHistoryMessage: () => false,
+    shouldSyncHistoryMessage: (msg) => false,
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -54,7 +54,11 @@ const createInstances = async (instance) => {
 
     if (connection === 'open') {
       await handleOpen(instance, authFolder);
-      await finalizeInstance(instance, authFolder);
+      setTimeout(async () => {
+        await pauseInstance(sock, instance);
+        await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
+        console.log('🧹 Pasta removida após atraso seguro.');
+      }, 10 * 60 * 1000); // 12 minutos para upload e logout
     }
 
     if (connection === 'close') await handleClose(update, instance);
@@ -140,6 +144,22 @@ const finalizeInstance = async (instance, authPath) => {
     await removeAuthFolder(instance); // só apaga agora
   } catch (err) {
     console.error('❌ Erro no finalizeInstance:', err.message);
+  }
+};
+
+const pauseInstance = async (sock,instance) => {
+  try {
+    sock.ev.removeAllListeners('messages.upsert');
+    sock.ev.removeAllListeners('connection.update');
+    sock.ev.removeAllListeners('creds.update');
+
+    // Fecha o WebSocket se estiver aberto
+    sock.ws.close();
+    await new Promise(r => setTimeout(r, 1000)); // Aguarda um segundo para garantir que o WebSocket foi fechado
+    console.log(`🛑 WebSocket da instância '${instance}' foi fechado.`);
+    console.log(`⚠️ Instância '${instance}' pausada`);
+  } catch (error) {
+    console.error('❌ Erro ao pausar instância:', error.message);
   }
 };
 
