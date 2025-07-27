@@ -219,7 +219,7 @@ const uploadToS3 = async (instance) => {
 const removeAuthFolder = async (instance) => {
   const authPath = path.resolve(__dirname, '..', 'auth', instance);
 
-  const timeoutMs = 12 * 60 * 1000; // 12 minutos
+  const timeoutMs = 15 * 60 * 1000; // 15 minutos
   const timeoutId = setTimeout(() => {
     console.error(`⏰ Timeout ao tentar remover pasta ${authPath}`);
   }, timeoutMs);
