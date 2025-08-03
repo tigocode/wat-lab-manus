@@ -33,19 +33,10 @@ const createInstances = async (instance) => {
     version,
     auth: state,
     printQRInTerminal: false,
-    shouldSyncHistoryMessage: (msg) => false,
+    shouldSyncHistoryMessage: (msg) => true,
   });
 
   sock.ev.on('creds.update', saveCreds);
-
-  /*   // ✅ Espera o evento de sincronização 100%
-    sock.ev.on('messaging-history.set', async ({ progress }) => {
-      if (progress === 100) {
-        syncCompleted = true;
-        console.log('✅ Sincronização de mensagens concluída (progress = 100)');
-        await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
-      }
-    }); */
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr } = update;
@@ -58,7 +49,7 @@ const createInstances = async (instance) => {
         await pauseInstance(sock, instance);
         await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
         console.log('🧹 Pasta removida após atraso seguro.');
-      }, 10 * 60 * 1000); // 12 minutos para upload e logout
+      }, 20 * 60 * 1000); // 20 minutos para upload e logout
     }
 
     if (connection === 'close') await handleClose(update, instance);
@@ -163,7 +154,7 @@ const pauseInstance = async (sock,instance) => {
   }
 };
 
-const handleClose = async (update, instance, authFolder) => {
+const handleClose = async (update, instance) => {
   const { lastDisconnect } = update;
   const statusCode = lastDisconnect?.error?.output?.statusCode;
   const loggedOut = statusCode === DisconnectReason.loggedOut;
@@ -225,7 +216,7 @@ const removeAuthFolder = async (instance) => {
   }, timeoutMs);
 
   try {
-    await waitFor('Remoção da pasta de autenticação', 2 * 60 * 1000); // 2 minutos
+    await waitFor('Remoção da pasta de autenticação', 5 * 60 * 1000); // 5 minutos
 
     if (await fs.pathExists(authPath)) {
       await fs.remove(authPath);
