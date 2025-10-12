@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualizador de QR Code</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #2563eb 100%, #56ccf2 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        color: #333;
+      }
+
+      h1 {
+        color: white;
+        font-size: 2.75rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        width: 100%;
+        max-width: 580px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .label {
+        font-weight: 600;
+        text-align: center;
+        color: #333;
+        font-size: 1.78rem;
+      }
+      .preview {
+        background: #f8f9fc;
+        border-radius: 8px;
+        border: 2px dashed #2564eb7e;
+        height: 350px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        text-align: center;
+        color: #777;
+        font-size: 0.9rem;
+        flex-direction: column;
+      }
+
+      .preview img {
+        max-width: 100%;
+        height: 100%;
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 1.2rem;
+        }
+        textarea {
+          height: 80px;
+        }
+        .card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Conecte seu WhatsApp</h1>
+    <div class="card">
+      <div class="label">
+        <label for="qrInput">Leia o QR Code</label>
+      </div>
+      <div class="preview" id="preview">
+        <p>
+          Nenhum QR code carregado<br /><small
+            >Aguarde o QR code carregar...</small
+          >
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // Função para buscar parâmetros da URL
+      function getQueryParam(param) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(param);
+      }
+
+      async function carregarQR() {
+        const id = getQueryParam("id"); // pega o ID do link gerado
+        const preview = document.getElementById("preview");
+
+        console.log(id);
+
+        if (!id) {
+          preview.innerHTML = `<p style="color:red;">ID do QR Code não informado na URL.</p>`;
+          return;
+        }
+
+        try {
+          // Faz a requisição ao backend para buscar o base64
+          const res = await fetch(`http://localhost:3002/qr/base64/${id}`);
+          const data = await res.json();
+
+          if (res.ok && data.base64) {
+            preview.innerHTML = `<img src="${data.base64}" alt="QR Code" />`;
+          } else {
+            preview.innerHTML = `<p style="color:red;">QR Code expirado ou não encontrado.</p>`;
+          }
+        } catch (err) {
+          preview.innerHTML = `<p style="color:red;">Erro ao carregar o QR Code.</p>`;
+          console.error(err);
+        }
+      }
+
+      // Carrega o QR Code automaticamente ao abrir a página
+      window.onload = carregarQR;
+    </script>
+  </body>
+</html>
