@@ -10,5 +10,6 @@ router.get('/', (req, res) => {
 router.post('/start-session', instance.startSession);
 router.post('/generate-qr-link', instance.generateQRLink);
 router.get("/qr/base64/:id", instance.searchID);
+router.post('/getinstance', instance.Index);
 
 module.exports = router;

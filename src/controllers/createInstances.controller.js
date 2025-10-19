@@ -3,6 +3,7 @@ const {
   createInstances,
   timeForQrCode,
 } = require("../services/createInstances");
+const { selectInstance } = require("../services/selectInstance");
 
 const { v4: uuidv4 } = require("uuid");
 
@@ -57,7 +58,7 @@ module.exports = {
       const link = `${req.protocol}://${req.get(
         "host"
       )}/qr/viewer.html?id=${id}`;
-      return res.status(200).json({ link });
+      return res.status(200).json({ link, id });
     } catch (err) {
       console.error("❌ Erro ao gerar link QR Code:", err);
       return res.status(500).json({ error: "Erro interno ao gerar link" });
@@ -75,6 +76,23 @@ module.exports = {
       }
 
       return res.json({ base64 });
+    } catch (err) {
+      console.error("❌ Erro ao buscar QR Code:", err);
+      return res.status(500).json({ error: "Erro interno ao buscar QR Code" });
+    }
+  },
+
+  async Index(req, res) {
+    try {
+      const { instance } = req.body;
+
+      if (!instance) {
+        return res.status(404).json({ error: "Instancia não existe" });
+      }
+
+      const response = await selectInstance(instance);
+
+      return res.json({ response });
     } catch (err) {
       console.error("❌ Erro ao buscar QR Code:", err);
       return res.status(500).json({ error: "Erro interno ao buscar QR Code" });
