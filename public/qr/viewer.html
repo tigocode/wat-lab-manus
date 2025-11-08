@@ -119,7 +119,7 @@
 
         try {
           // Faz a requisição ao backend para buscar o base64
-          const res = await fetch(`http://localhost:3002/qr/base64/${id}`);
+          const res = await fetch(`https://watapi.codenu.com.br/qr/base64/${id}`);
           const data = await res.json();
 
           if (res.ok && data.base64) {
