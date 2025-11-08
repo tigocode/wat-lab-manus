@@ -21,7 +21,7 @@ router.get('/qr/base64/:id', (req, res) => {
 });
 
 
-app.listen(process.env.PORT || 443, () => {
+app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
   let date = new Date();
   console.log(`Servidor HTTPS rodando na PORT ${process.env.PORT || 443} desde: ${date.toLocaleString()}`);
 });
