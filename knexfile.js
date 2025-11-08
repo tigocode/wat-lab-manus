@@ -2,35 +2,35 @@ require('dotenv').config();
 
 module.exports = {
   development: {
-    client: 'mysql2',
+    client: "mysql2",
     connection: {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      host: process.env.DEV_DB_HOST,
+      port: process.env.DEV_DB_PORT || 3306,
+      user: process.env.DEV_DB_USER,
+      password: process.env.DEV_DB_PASSWORD,
+      database: process.env.DEV_DB_NAME,
     },
     useNullAsDefault: true,
     migrations: {
-      directory: 'src/connection/migrations',
+      directory: "src/connection/migrations",
+      seeds: { directory: "src/connection/seeds" },
     },
     seeds: {
-      directory: 'src/connection/seeds',
+      directory: "src/connection/seeds",
     },
   },
 
   production: {
-    client: 'pg',
-    connection: process.env.DATABASE_URL,
-    pool: {
-      min: 2,
-      max: 10,
+    client: "mysql2",
+    connection: {
+      host: process.env.PROD_DB_HOST,
+      port: process.env.PROD_DB_PORT || 3306,
+      user: process.env.PROD_DB_USER,
+      password: process.env.PROD_DB_PASSWORD,
+      database: process.env.PROD_DB_NAME,
     },
-    migrations: {
-      directory: 'src/connection/migrations',
-    },
-    seeds: {
-      directory: 'src/connection/seeds',
-    },
+    pool: { min: 2, max: 10 },
+    migrations: { directory: "src/connection/migrations" },
+    seeds: { directory: "src/connection/seeds" },
   },
 };

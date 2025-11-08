@@ -3,7 +3,7 @@ const router = express.Router();
 
 const instance = require('../controllers/createInstances.controller');
 
-router.get('/', (req, res) => {
+router.get('/wat-health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date(), message: '✅ API WatAPI rodando com sucesso!' });
 });
 
