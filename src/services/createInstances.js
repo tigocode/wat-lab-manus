@@ -1,17 +1,17 @@
-require('dotenv').config();
+require("dotenv").config();
 
 const {
   default: makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
-const QRCode = require('qrcode');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const fs = require('fs-extra');
-const path = require('path');
-const connec = require('../connection/connection');
-const { waitFor } = require('../utils/waitFor');
+  fetchLatestBaileysVersion,
+} = require("@whiskeysockets/baileys");
+const QRCode = require("qrcode");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const fs = require("fs-extra");
+const path = require("path");
+const connec = require("../connection/connection");
+const { waitFor } = require("../utils/waitFor");
 
 let sock;
 const S3 = new S3Client({
@@ -26,33 +26,47 @@ const createInstances = async (instance) => {
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Usando versão do WhatsApp Web: ${version}, atual? ${isLatest}`);
 
-  const authFolder = path.resolve(__dirname, '..', 'auth', instance);
+  const authFolder = path.resolve(__dirname, "..", "auth", instance);
   const { state, saveCreds } = await useMultiFileAuthState(authFolder);
 
   sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: false,
-    shouldSyncHistoryMessage: (msg) => true,
+    browser: ["WatLab", "Chrome", "10.0.0"],
+    syncFullHistory: false, // Evita bugs de sincronização
+    markOnlineOnConnect: false,
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on('connection.update', async (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { connection, qr } = update;
 
     if (qr) await handleQr(update, instance);
 
-    if (connection === 'open') {
-      await handleOpen(instance, authFolder);
+    if (connection === "open") {
+      console.log("✅ Sessão conectada, aguardando estabilização...");
+      await new Promise((r) => setTimeout(r, 2000)); // espera 2s antes de operações
+
+      try {
+        await handleOpen(instance, authFolder);
+      } catch (err) {
+        console.error('❌ Erro ao atualizar estado "open":', err.message);
+      }
+
       setTimeout(async () => {
-        await pauseInstance(sock, instance);
-        await finalizeInstance(instance, authFolder); // 🔄 chama função que envia p/ S3 e encerra sessão
-        console.log('🧹 Pasta removida após atraso seguro.');
-      }, 20 * 60 * 1000); // 20 minutos para upload e logout
+        try {
+          await pauseInstance(sock, instance);
+          await finalizeInstance(instance, authFolder);
+          console.log("🧹 Pasta removida após atraso seguro.");
+        } catch (err) {
+          console.error("❌ Erro ao encerrar instância:", err.message);
+        }
+      }, 20 * 60 * 1000);
     }
 
-    if (connection === 'close') await handleClose(update, instance);
+    if (connection === "close") await handleClose(update, instance);
   });
 
   return {
@@ -67,29 +81,24 @@ const handleQr = async (update, instance) => {
   const expires = new Date(Date.now() + 5 * 60 * 1000);
 
   const payload = {
-    status: 'QrCode',
+    status: "QrCode",
     qrcode: dataQrCode,
     qr_expires_at: expires,
     updated_at: connec.fn.now(),
   };
 
-  const exists = await connec('instances')
-    .where({ instance })
-    .first();
+  const exists = await connec("instances").where({ instance }).first();
   if (exists) {
-    await connec('instances')
-      .where({ instance })
-      .update(payload);
+    await connec("instances").where({ instance }).update(payload);
   } else {
-    await connec('instances')
-      .insert({ instance, ...payload });
+    await connec("instances").insert({ instance, ...payload });
   }
 };
 
 const getQrCode = async (instance) => {
-  const Qrcode = await connec('instances')
+  const Qrcode = await connec("instances")
     .where({ instance })
-    .select('qrcode')
+    .select("qrcode")
     .first();
 
   return Qrcode;
@@ -105,52 +114,57 @@ const timeForQrCode = async (instance, maxRetries = 10, delay = 500) => {
 };
 
 const handleOpen = async (instance) => {
-  const wId = sock.user.id.split(':')[0];
+  const wId = sock.user.id.split(":")[0];
 
-  await connec('instances')
-    .where({ instance })
-    .update({
-      status: 'connected',
-      phone: wId,
-      qrcode: null,
-      qr_expires_at: null,
-      updated_at: connec.fn.now(),
-    });
-  console.log('✅ Conectado com sucesso:', wId);
+  await connec("instances").where({ instance }).update({
+    status: "connected",
+    phone: wId,
+    qrcode: null,
+    qr_expires_at: null,
+    updated_at: connec.fn.now(),
+  });
+  console.log("✅ Conectado com sucesso:", wId);
 };
 
 const finalizeInstance = async (instance, authPath) => {
-  const requiredFiles = ['creds.json'];
-  const hasRequiredFiles = requiredFiles.every(file =>
+  const requiredFiles = ["creds.json"];
+  const hasRequiredFiles = requiredFiles.every((file) =>
     fs.existsSync(path.join(authPath, file))
   );
   if (!hasRequiredFiles) {
-    console.warn('⚠️ Credenciais incompletas, adiando upload e logout.');
+    console.warn("⚠️ Credenciais incompletas, adiando upload e logout.");
     return;
   }
 
   try {
     await uploadToS3(instance);
-    console.log('🔒 Sessão encerrada com sucesso após upload.');
+    console.log("🔒 Sessão encerrada com sucesso após upload.");
     await removeAuthFolder(instance); // só apaga agora
   } catch (err) {
-    console.error('❌ Erro no finalizeInstance:', err.message);
+    console.error("❌ Erro no finalizeInstance:", err.message);
   }
 };
 
-const pauseInstance = async (sock,instance) => {
+const pauseInstance = async (sock, instance) => {
   try {
-    sock.ev.removeAllListeners('messages.upsert');
-    sock.ev.removeAllListeners('connection.update');
-    sock.ev.removeAllListeners('creds.update');
+    sock.ev.removeAllListeners("messages.upsert");
+    sock.ev.removeAllListeners("connection.update");
+    sock.ev.removeAllListeners("creds.update");
 
     // Fecha o WebSocket se estiver aberto
-    sock.ws.close();
-    await new Promise(r => setTimeout(r, 1000)); // Aguarda um segundo para garantir que o WebSocket foi fechado
+    if (sock?.end) {
+      await sock.end(new Error("PauseInstance: encerrando sessão"));
+      console.log(`🛑 Sessão finalizada com Baileys.end() (${instance})`);
+    } else if (sock?.ws?.readyState === 1) {
+      sock.ws.close();
+      console.log(`🛑 WebSocket fechado manualmente (${instance})`);
+    }
+
+    await new Promise((r) => setTimeout(r, 1000)); // Aguarda um segundo para garantir que o WebSocket foi fechado
     console.log(`🛑 WebSocket da instância '${instance}' foi fechado.`);
     console.log(`⚠️ Instância '${instance}' pausada`);
   } catch (error) {
-    console.error('❌ Erro ao pausar instância:', error.message);
+    console.error("❌ Erro ao pausar instância:", error.message);
   }
 };
 
@@ -159,32 +173,33 @@ const handleClose = async (update, instance) => {
   const statusCode = lastDisconnect?.error?.output?.statusCode;
   const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-  console.log('🔌 Conexão encerrada, por:', statusCode);
+  console.log("🔌 Conexão encerrada, por:", statusCode);
 
   if (loggedOut) {
     await removeAuthFolder(instance);
   }
 
-  await connec('instances')
+  await connec("instances")
     .where({ instance })
     .update({
-      status: loggedOut ? 'disconnected' : 'disconnected',
+      status: loggedOut ? "disconnected" : "disconnected",
       updated_at: connec.fn.now(),
     });
 
   if (!loggedOut) {
     console.log(`🔄 Tentando reconectar instância: ${instance}`);
+    await new Promise((r) => setTimeout(r, 5000));
     await createInstances(instance);
   } else {
     // Se desconectou por logout, pode aguardar nova chamada para criação
-    console.log('⚠️ Sessão finalizada via logout. Aguardando nova criação.');
+    console.log("⚠️ Sessão finalizada via logout. Aguardando nova criação.");
   }
 };
 
 const uploadToS3 = async (instance) => {
-  const authPath = path.join(__dirname, '..', 'auth', instance);
+  const authPath = path.join(__dirname, "..", "auth", instance);
 
-  if (!await fs.pathExists(authPath)) {
+  if (!(await fs.pathExists(authPath))) {
     console.warn(`⚠️ Caminho de autenticação não encontrado: ${authPath}`);
     return;
   }
@@ -199,7 +214,7 @@ const uploadToS3 = async (instance) => {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: `auth/${instance}/${file}`,
       Body: fileContent,
-      ContentType: 'application/json',
+      ContentType: "application/json",
     });
 
     await S3.send(command);
@@ -208,7 +223,7 @@ const uploadToS3 = async (instance) => {
 };
 
 const removeAuthFolder = async (instance) => {
-  const authPath = path.resolve(__dirname, '..', 'auth', instance);
+  const authPath = path.resolve(__dirname, "..", "auth", instance);
 
   const timeoutMs = 15 * 60 * 1000; // 15 minutos
   const timeoutId = setTimeout(() => {
@@ -216,13 +231,15 @@ const removeAuthFolder = async (instance) => {
   }, timeoutMs);
 
   try {
-    await waitFor('Remoção da pasta de autenticação', 5 * 60 * 1000); // 5 minutos
+    await waitFor("Remoção da pasta de autenticação", 5 * 60 * 1000); // 5 minutos
 
     if (await fs.pathExists(authPath)) {
       await fs.remove(authPath);
       console.log(`🧹 Pasta de autenticação ${authPath} removida com sucesso!`);
     } else {
-      console.warn(`⚠️ Pasta de autenticação ${authPath} não encontrada para remover.`);
+      console.warn(
+        `⚠️ Pasta de autenticação ${authPath} não encontrada para remover.`
+      );
     }
   } catch (err) {
     throw new Error(`❌ Erro ao remover pasta ${authPath}: ${err.message}`);
@@ -231,8 +248,7 @@ const removeAuthFolder = async (instance) => {
   }
 };
 
-
 module.exports = {
   createInstances,
-  timeForQrCode
+  timeForQrCode,
 };
