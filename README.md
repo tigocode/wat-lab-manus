@@ -1,79 +1,31 @@
 # WAT-LAB
 
-## Introdução
+API Node/Express para criação e gerenciamento de instâncias WhatsApp com Baileys. A persistência de instâncias e QR Codes usa **Cloud Firestore**; as credenciais de sessão usam **Firebase Storage**.
 
-API para criação de instâncias WhatsApp e geração de QR Code para autenticação.
+## Endpoints
 
----
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/wat-health` | Verifica a saúde da API. |
+| POST | `/start-session` | Recebe `{ company, name }`, inicia uma instância e retorna o QR em data URL. |
+| POST | `/generate-qr-link` | Persiste um QR temporário e retorna um link para o visualizador. |
+| GET | `/qr/base64/:id` | Consulta o QR temporário. |
+| POST | `/getinstance` | Recebe `{ instance }` e retorna o documento Firestore. |
+| POST | `/logout-session` | Recebe `{ instance }` e encerra o socket da instância. |
 
-## Como usar
+Quando `REQUIRE_FIREBASE_AUTH=true`, todas as rotas exceto `/wat-health` exigem `Authorization: Bearer <Firebase ID token>`.
 
-### Endpoint: Iniciar Sessão
+## Configuração
 
-**POST** `/start-session`
+Copie `.env.example` para `.env` e preencha `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` e `FIREBASE_STORAGE_BUCKET`. A chave privada deve preservar as quebras de linha como `\\n`. Em produção, use um mecanismo seguro de secrets; não comite credenciais.
 
-Inicia uma nova sessão e retorna o QR Code para autenticação.
+O clone `gestorsales-new` deve configurar `EXPO_PUBLIC_WAT_API_URL` com a URL pública desta API e as variáveis públicas do Firebase Client SDK. Credenciais administrativas nunca devem ser colocadas no aplicativo móvel.
 
-#### Parâmetros (JSON no body):
+## Execução
 
-| Campo   | Tipo   | Obrigatório | Descrição                |
-|---------|--------|-------------|--------------------------|
-| company | string | Sim         | Nome da empresa          |
-| name    | string | Sim         | Nome do usuário/instância|
-
-#### Exemplo de requisição
-
-```json
-POST /start-session
-Content-Type: application/json
-
-{
-  "company": "MinhaEmpresa",
-  "name": "Joao"
-}
+```bash
+npm install
+npm start
 ```
 
-#### Exemplo de resposta (sucesso)
-
-```json
-{
-  "message": "Instância criada com sucesso!",
-  "instance": "MJJO-123456",
-  "Qrcode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
-}
-```
-
-#### Possíveis erros
-
-- **400**: Empresa e nome são obrigatórios
-- **408**: QR Code não gerado a tempo
-- **500**: Erro ao iniciar sessão
-
----
-
-## Variáveis de ambiente
-
-Veja o arquivo [.env](.env) para configuração do banco de dados, AWS e porta.
-
----
-
-## Scripts
-
-- `npm run dev` — inicia em modo desenvolvimento (nodemon)
-- `npm start` — inicia em modo produção
-
----
-
-## Estrutura de Pastas
-
-- `src/controllers` — Lógica dos endpoints
-- `src/services` — Serviços de instância e integração
-- `src/connection` — Conexão e migrações do banco
-- `src/routes` — Rotas da API
-
----
-
-## Observações
-
-- O QR Code retornado está em formato base64 (data URL).
-- Após autenticação, a sessão é salva e enviada para o S3
+O modo de desenvolvimento continua disponível com `npm run dev`. O backend usa um mapa de sockets por instância, restaura autenticação do Storage e sincroniza os arquivos de sessão periodicamente para permitir recuperação após reinício.

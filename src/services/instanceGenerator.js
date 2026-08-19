@@ -1,26 +1,16 @@
 const crypto = require('crypto');
 
-const instanceGenerator = async (company, name) => {
-  const hashcompany = await extractedFirstAndLast(company);
-  const hashname = await extractedFirstAndLast(name);
+function firstAndLast(value) {
+  const text = String(value || '').trim();
+  if (!text) throw new Error('Valor inválido para geração da instância');
+  return `${text[0]}${text[text.length - 1]}`.toUpperCase();
+}
 
-  const instance = `${hashcompany}${hashname}`;
-
-  const hash = crypto.createHash('sha256').update(instance).digest('hex');
+async function instanceGenerator(company, name) {
+  const seed = `${firstAndLast(company)}${firstAndLast(name)}`;
+  const hash = crypto.createHash('sha256').update(seed).digest('hex');
   const numericHash = parseInt(hash.slice(0, 8), 16);
-  const code = (numericHash % 900000) + 100000;
-
-  return code.toString();
-};
-
-const extractedFirstAndLast = async (text) => {
-  const partsText = text.split('');
-  const first = partsText[0].toUpperCase();
-  const last = partsText[partsText.length - 1].toUpperCase();
-
-  return `${first}${last}`;
+  return String((numericHash % 900000) + 100000);
 }
 
-module.exports = {
-  instanceGenerator,
-}
+module.exports = { instanceGenerator };

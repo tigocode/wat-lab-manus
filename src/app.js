@@ -3,25 +3,26 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-
 const router = require('./routes/routes');
-const app = express();
 
+const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/qr', express.static(path.join(__dirname, '../public/qr')));
 app.use(router);
 
-router.get('/qr/base64/:id', (req, res) => {
-  const { id } = req.params;
-  const base64 = qrStore[id];
-  if (!base64) return res.status(404).json({ error: 'QR Code não encontrado' });
-  res.json({ base64 });
+app.use((error, req, res, next) => {
+  console.error('Erro não tratado:', error);
+  if (res.headersSent) return next(error);
+  return res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
+if (require.main === module) {
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`WatAPI rodando na porta ${port}`);
+  });
+}
 
-app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
-  let date = new Date();
-  console.log(`Servidor HTTPS rodando na PORT ${process.env.PORT || 443} desde: ${date.toLocaleString()}`);
-});
+module.exports = app;
