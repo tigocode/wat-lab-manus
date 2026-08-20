@@ -2,6 +2,20 @@
 
 API Node/Express para criação e gerenciamento de instâncias WhatsApp com Baileys. A persistência de instâncias e QR Codes usa **Cloud Firestore**; as credenciais de sessão usam **Firebase Storage**.
 
+> **Configuração local:** o passo a passo completo está em [`SETUP.md`](./SETUP.md). Ele inclui Firebase Emulator Suite, Firestore, Storage, QR Code do Baileys, restauração de sessão e configuração com Firebase real.
+
+## Início rápido local
+
+```bash
+npm install
+cp .env.example .env
+npx firebase-tools@latest emulators:start --project wat-lab-local --only firestore,storage
+```
+
+Em outro terminal, configure no `.env` `FIREBASE_PROJECT_ID=wat-lab-local`, `FIREBASE_STORAGE_BUCKET=wat-lab-local.appspot.com`, `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, `STORAGE_EMULATOR_HOST=127.0.0.1:9199` e `REQUIRE_FIREBASE_AUTH=false`. Depois execute `npm start`. O painel dos emuladores estará em [http://127.0.0.1:4000](http://127.0.0.1:4000).
+
+Para iniciar o fluxo Baileys, execute `POST /start-session`, leia o QR retornado com o WhatsApp e consulte `POST /getinstance`. O roteiro de comandos `curl` está no [`SETUP.md`](./SETUP.md).
+
 ## Endpoints
 
 | Método | Rota | Descrição |
